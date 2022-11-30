@@ -136,6 +136,14 @@ var assertThrowsAsync;
 // Assert that the passed function or eval code does not throw an exception.
 var assertDoesNotThrow;
 
+// Assert that the passed code throws an early error (i.e. throws a SyntaxError
+// at parse time).
+var assertEarlyError;
+
+// Assert that the passed code throws an exception when executed.
+// Fails if the passed code throws an exception at parse time.
+var assertThrowsAtRuntime;
+
 // Asserts that the found value is an instance of the constructor passed
 // as the second argument.
 var assertInstanceof;
@@ -193,10 +201,10 @@ var V8OptimizationStatus = {
 // Returns true if --lite-mode is on and we can't ever turn on optimization.
 var isNeverOptimizeLiteMode;
 
-// Returns true if --no-opt mode is on.
+// Returns true if --no-turbofan mode is on.
 var isNeverOptimize;
 
-// Returns true if --always-opt mode is on.
+// Returns true if --always-turbofan mode is on.
 var isAlwaysOptimize;
 
 // Returns true if given function in interpreted.
@@ -374,9 +382,13 @@ var prettyPrinted;
 
 
   function deepObjectEquals(a, b) {
-    var aProps = Object.keys(a);
+    // Note: This function does not check prototype equality.
+
+    // For now, treat two objects the same even if some property is configured
+    // differently (configurable, enumerable, writable).
+    var aProps = Object.getOwnPropertyNames(a);
     aProps.sort();
-    var bProps = Object.keys(b);
+    var bProps = Object.getOwnPropertyNames(b);
     bProps.sort();
     if (!deepEquals(aProps, bProps)) {
       return false;
@@ -582,6 +594,25 @@ var prettyPrinted;
         e => checkException(e, type_opt, cause_opt));
   };
 
+  assertEarlyError = function assertEarlyError(code) {
+    try {
+      new Function(code);
+    } catch (e) {
+      checkException(e, SyntaxError);
+      return;
+    }
+    failWithMessage('Did not throw exception while parsing');
+  }
+
+  assertThrowsAtRuntime = function assertThrowsAtRuntime(code, type_opt) {
+    const f = new Function(code);
+    if (arguments.length > 1 && type_opt !== undefined) {
+      assertThrows(f, type_opt);
+    } else {
+      assertThrows(f);
+    }
+  }
+
   assertInstanceof = function assertInstanceof(obj, type) {
     if (!(obj instanceof type)) {
       var actualTypeName = null;
@@ -699,10 +730,10 @@ var prettyPrinted;
   assertUnoptimized = function assertUnoptimized(
       fun, name_opt, skip_if_maybe_deopted = true) {
     var opt_status = OptimizationStatus(fun);
-    // Tests that use assertUnoptimized() do not make sense if --always-opt
-    // option is provided. Such tests must add --no-always-opt to flags comment.
+    // Tests that use assertUnoptimized() do not make sense if --always-turbofan
+    // option is provided. Such tests must add --no-always-turbofan to flags comment.
     assertFalse((opt_status & V8OptimizationStatus.kAlwaysOptimize) !== 0,
-                "test does not make sense with --always-opt");
+                "test does not make sense with --always-turbofan");
     assertTrue((opt_status & V8OptimizationStatus.kIsFunction) !== 0, name_opt);
     if (skip_if_maybe_deopted &&
         (opt_status & V8OptimizationStatus.kMaybeDeopted) !== 0) {
@@ -724,10 +755,10 @@ var prettyPrinted;
       print("Warning: Test uses assertOptimized in Lite mode, skipping test.");
       testRunner.quit(0);
     }
-    // Tests that use assertOptimized() do not make sense if --no-opt
-    // option is provided. Such tests must add --opt to flags comment.
+    // Tests that use assertOptimized() do not make sense if --no-turbofan
+    // option is provided. Such tests must add --turbofan to flags comment.
     assertFalse((opt_status & V8OptimizationStatus.kNeverOptimize) !== 0,
-                "test does not make sense with --no-opt");
+                "test does not make sense with --no-turbofan");
     assertTrue(
         (opt_status & V8OptimizationStatus.kIsFunction) !== 0,
         'should be a function: ' + name_opt);
