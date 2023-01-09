@@ -172,8 +172,10 @@ void Stack::IteratePointers(StackVisitor* visitor) const {
       visitor, reinterpret_cast<const void* const*>(context_->stack_marker),
       stack_start_, asan_fake_stack);
 
-  for (const auto& stack : inactive_stacks_) {
-    IteratePointersInStack(visitor, stack.top, stack.start, asan_fake_stack);
+  if (inactive_stacks_) {
+    for (const auto& stack : *inactive_stacks_) {
+      IteratePointersInStack(visitor, stack.top, stack.start, asan_fake_stack);
+    }
   }
 
   IterateUnsafeStackIfNecessary(visitor);
@@ -234,9 +236,12 @@ void Stack::ClearContext(bool check_invariant) {
 
 void Stack::AddStackSegment(const void* start, const void* top) {
   DCHECK_LE(top, start);
-  inactive_stacks_.push_back({start, top});
+  if (!inactive_stacks_) {
+    inactive_stacks_ = std::make_unique<std::remove_reference_t<decltype(*inactive_stacks_)>>();
+  }
+  inactive_stacks_->push_back({start, top});
 }
 
-void Stack::ClearStackSegments() { inactive_stacks_.clear(); }
+void Stack::ClearStackSegments() { if (inactive_stacks_) inactive_stacks_->clear(); }
 
 }  // namespace heap::base

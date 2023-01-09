@@ -124,7 +124,7 @@ class V8_EXPORT_PRIVATE Stack final {
     const void* start;
     const void* top;
   };
-  std::vector<StackSegments> inactive_stacks_;
+  std::unique_ptr<std::vector<StackSegments>> inactive_stacks_;
 };
 
 }  // namespace heap::base
